@@ -9,7 +9,7 @@ const mergedCfg = megre(cfg, {
     libraryTarget: 'var',
   },
   entry: {
-    devServer: './src/devServer.tsx',
+    devServer: './development/devServer.tsx',
   },
   externals: 'replace',
   devServer: {
