@@ -3,6 +3,8 @@ import React, { useState } from 'react'
 type Props = React.HTMLAttributes<HTMLUListElement> & {
   children: React.ReactNodeArray
   itemHeight: number
+  itemsToAddAmount?: number
+  cleanUpThreshold?: number
 }
 
 type ItemsToRenderReducer = {
@@ -10,7 +12,13 @@ type ItemsToRenderReducer = {
   action: 'push' | 'set' | 'unshift'
 }
 
-const InfiniteList = ({ children, itemHeight, ...props }: Props): JSX.Element => {
+const InfiniteList = ({
+  children,
+  itemHeight,
+  itemsToAddAmount = 10,
+  cleanUpThreshold = 30,
+  ...props
+}: Props): JSX.Element => {
   const [mappedItems, setMappedItems] = React.useState<Array<JSX.Element>>([])
   const itemsToRenderReducer = (
     state: Array<JSX.Element>,
@@ -34,15 +42,16 @@ const InfiniteList = ({ children, itemHeight, ...props }: Props): JSX.Element =>
   const [lastOperation, setLastOperation] = useState<'append' | 'prepend'>('append')
 
   const pushNextItemsToRender = React.useCallback(() => {
-    const nextKey = parseInt(itemsToRender[itemsToRender.length - 1].key as string, 10) + 1
-    const nextLimit = nextKey + 10 > mappedItems.length - 1 ? mappedItems.length : nextKey + 10
+    const nextKey = parseInt(itemsToRender[itemsToRender.length - 1].key as string, itemsToAddAmount) + 1
+    const nextLimit =
+      nextKey + itemsToAddAmount > mappedItems.length - 1 ? mappedItems.length : nextKey + itemsToAddAmount
     itemsToRenderDispatch({ action: 'push', payload: mappedItems.slice(nextKey, nextLimit) })
     setLastOperation('append')
-  }, [mappedItems, itemsToRender])
+  }, [mappedItems, itemsToRender, itemsToAddAmount])
 
   const pushPreviousItemsToRender = React.useCallback(() => {
-    const startKey = parseInt(itemsToRender[0].key as string, 10)
-    const endKey = startKey - 10 < 0 ? 0 : startKey - 10
+    const startKey = parseInt(itemsToRender[0].key as string, itemsToAddAmount)
+    const endKey = startKey - itemsToAddAmount < 0 ? 0 : startKey - itemsToAddAmount
 
     if (startKey == 0 && endKey == 0) {
       return
@@ -56,7 +65,7 @@ const InfiniteList = ({ children, itemHeight, ...props }: Props): JSX.Element =>
     }
 
     setLastOperation('prepend')
-  }, [mappedItems, itemsToRender, listRef, itemHeight])
+  }, [mappedItems, itemsToRender, listRef, itemsToAddAmount, itemHeight])
 
   const handleIntersect = React.useCallback(
     (entries: IntersectionObserverEntry[]) => {
@@ -71,7 +80,7 @@ const InfiniteList = ({ children, itemHeight, ...props }: Props): JSX.Element =>
         }
       })
     },
-    [mappedItems, itemsToRender, listRef]
+    [mappedItems, itemsToRender, listRef, itemsToAddAmount]
   )
 
   React.useEffect(() => {
@@ -80,8 +89,8 @@ const InfiniteList = ({ children, itemHeight, ...props }: Props): JSX.Element =>
     })
 
     setMappedItems(mappedChildren)
-    itemsToRenderDispatch({ action: 'push', payload: mappedChildren.slice(0, 10) })
-  }, [children])
+    itemsToRenderDispatch({ action: 'push', payload: mappedChildren.slice(0, itemsToAddAmount) })
+  }, [children, itemsToAddAmount])
 
   React.useEffect(() => {
     const options = {
@@ -102,20 +111,20 @@ const InfiniteList = ({ children, itemHeight, ...props }: Props): JSX.Element =>
     return (): void => {
       observer.disconnect()
     }
-  }, [topTriggerRef, bottomTriggerRef, mappedItems, itemsToRender, listRef])
+  }, [topTriggerRef, bottomTriggerRef, mappedItems, itemsToRender, listRef, itemsToAddAmount])
 
   React.useEffect(() => {
-    if (itemsToRender.length > 30) {
+    if (itemsToRender.length > cleanUpThreshold) {
       if (lastOperation == 'append' && listRef.current) {
-        const lastIndex = parseInt((itemsToRender[itemsToRender.length - 1].key as string) || '0', 10)
-        itemsToRenderDispatch({ action: 'set', payload: itemsToRender.slice(10, lastIndex) })
+        const lastIndex = parseInt((itemsToRender[itemsToRender.length - 1].key as string) || '0', itemsToAddAmount)
+        itemsToRenderDispatch({ action: 'set', payload: itemsToRender.slice(itemsToAddAmount, lastIndex) })
       }
 
       if (lastOperation == 'prepend') {
-        itemsToRenderDispatch({ action: 'set', payload: itemsToRender.slice(0, 20) })
+        itemsToRenderDispatch({ action: 'set', payload: itemsToRender.slice(0, itemsToAddAmount * 2) })
       }
     }
-  }, [lastOperation, itemsToRender, listRef, itemHeight])
+  }, [lastOperation, itemsToRender, listRef, itemHeight, itemsToAddAmount, cleanUpThreshold])
 
   return (
     <ul ref={listRef} {...props}>
